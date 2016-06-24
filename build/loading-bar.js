@@ -1,3 +1,9 @@
+/*! 
+ * angular-loading-bar v0.9.0
+ * https://chieffancypants.github.io/angular-loading-bar
+ * Copyright (c) 2016 Wes Cruver
+ * License: MIT
+ */
 /*!
  * angular-loading-bar v0.9.0
  * https://chieffancypants.github.io/angular-loading-bar
@@ -187,6 +193,7 @@
         var includeSpinner = this.includeSpinner;
         var includeBar = this.includeBar;
         var startSize = this.startSize;
+        var isActivate = this.isActivate;
 
         /**
          * Inserts the loading bar element into the dom, and sets it to 2%
@@ -319,20 +326,20 @@
         }
 
         function _isLoaderActivated() {
-          return this.isActivate;
+          return isActivate;
         }
 
         function _useLoader(bool) {
           if (typeof(bool) === 'boolean') {
-            this.isActivate = bool;
+            isActivate = bool;
           }
         }
 
         function _setParentSelector(selector) {
           if (typeof selector === 'string') {
-            this.parentSelector = selector;
+            isActivate = selector;
           } else {
-            return 'Please provide a string as selector.'
+            return 'Please provide a string as selector.';
           }
         }
 
