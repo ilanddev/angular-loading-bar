@@ -10,6 +10,12 @@
  * Copyright (c) 2016 Wes Cruver
  * License: MIT
  */
+/*!
+ * angular-loading-bar v0.9.0
+ * https://chieffancypants.github.io/angular-loading-bar
+ * Copyright (c) 2016 Wes Cruver
+ * License: MIT
+ */
 /*
  * angular-loading-bar
  *
@@ -97,20 +103,44 @@
           return cached;
         }
 
-        return {
-          'request': function(config) {
-            // Check to make sure this request hasn't already been cached and that
-            // the requester didn't explicitly ask us to ignore this request:
-            if (!config.ignoreLoadingBar && !isCached(config) && cfpLoadingBar.isLoaderActivated()) {
-              $rootScope.$broadcast('cfpLoadingBar:loading', {url: config.url});
-              if (reqsTotal === 0) {
-                startTimeout = $timeout(function() {
-                  cfpLoadingBar.start();
-                }, latencyThreshold);
-              }
-              reqsTotal++;
+        /**
+         * Handle the request.
+         * @param config
+         */
+        function handleRequest(config) {
+          // Check to make sure this request hasn't already been cached and that
+          // the requester didn't explicitly ask us to ignore this request:
+          if (!config.ignoreLoadingBar && !isCached(config) && cfpLoadingBar.isLoaderActivated()) {
+            $rootScope.$broadcast('cfpLoadingBar:loading', {url: config.url});
+            if (reqsTotal === 0) {
+              startTimeout = $timeout(function() {
+                cfpLoadingBar.start();
+              }, latencyThreshold);
+            }
+            reqsTotal++;
+            cfpLoadingBar.set(reqsCompleted / reqsTotal);
+          }
+        }
+
+        /**
+         * Handle the response or rejection.
+         * @param response
+         */
+        function handleResponse(response) {
+          if (!response.config.ignoreLoadingBar && !isCached(response.config) && cfpLoadingBar.isLoaderActivated()) {
+            reqsCompleted++;
+            $rootScope.$broadcast('cfpLoadingBar:loaded', {url: response.config.url, result: response});
+            if (reqsCompleted >= reqsTotal) {
+              setComplete();
+            } else {
               cfpLoadingBar.set(reqsCompleted / reqsTotal);
             }
+          }
+        }
+
+        return {
+          'request': function(config) {
+            handleRequest(config);
             return config;
           },
 
@@ -119,16 +149,7 @@
               $log.error('Broken interceptor detected: Config object not supplied in response:\n https://github.com/chieffancypants/angular-loading-bar/pull/50');
               return response;
             }
-
-            if (!response.config.ignoreLoadingBar && !isCached(response.config) && cfpLoadingBar.isLoaderActivated()) {
-              reqsCompleted++;
-              $rootScope.$broadcast('cfpLoadingBar:loaded', {url: response.config.url, result: response});
-              if (reqsCompleted >= reqsTotal) {
-                setComplete();
-              } else {
-                cfpLoadingBar.set(reqsCompleted / reqsTotal);
-              }
-            }
+            handleResponse(response);
             return response;
           },
 
@@ -137,16 +158,7 @@
               $log.error('Broken interceptor detected: Config object not supplied in rejection:\n https://github.com/chieffancypants/angular-loading-bar/pull/50');
               return $q.reject(rejection);
             }
-
-            if (!rejection.config.ignoreLoadingBar && !isCached(rejection.config) && cfpLoadingBar.isLoaderActivated()) {
-              reqsCompleted++;
-              $rootScope.$broadcast('cfpLoadingBar:loaded', {url: rejection.config.url, result: rejection});
-              if (reqsCompleted >= reqsTotal) {
-                setComplete();
-              } else {
-                cfpLoadingBar.set(reqsCompleted / reqsTotal);
-              }
-            }
+            handleResponse(rejection);
             return $q.reject(rejection);
           }
         };
@@ -249,7 +261,7 @@
             status = n;
           }
 
-          // increment loadingbar to give the illusion that there is always
+          // increment loading-bar to give the illusion that there is always
           // progress but make sure to cancel the previous timeouts so we don't
           // have multiple incs running at the same time.
           if (autoIncrement) {
@@ -269,6 +281,8 @@
             var promise = _getAnimate().leave(loadingBarContainer, _completeAnimation);
             if (promise && promise.then) {
               promise.then(_completeAnimation);
+            } else {
+              _completeAnimation();
             }
             $rootScope.$broadcast('cfpLoadingBar:completed');
             return;
@@ -278,19 +292,21 @@
           var stat = _status();
 
           function maxIncrement(stat) {
-            return (5.5/-99)*stat+(6.0);
+            return (5.5 / -99) * stat + (6.0);
           }
+
           function incrementer(stat) {
             var m = maxIncrement(stat);
             return (Math.random() * m) / 100;
           }
+
           if (stat >= 0.99) {
             rnd = 0;
           } else {
             rnd = incrementer(stat);
           }
 
-          var pct = _status() + rnd;
+          var pct = stat + rnd;
           _set(pct);
         }
 
@@ -301,17 +317,16 @@
         function _completeAnimation() {
           status = 0;
           started = false;
+          $rootScope.$broadcast('cfpLoadingBar:animation-completed');
+          _useLoader(false);
         }
 
         function _complete() {
-
+          // Clear timeout first then attempt to aggregate any start/complete calls within 500ms:
           $timeout.cancel(completeTimeout);
-
-          // Attempt to aggregate any start/complete calls within 500ms:
           completeTimeout = $timeout(function() {
             _set(1);
             _getAnimate().leave(spinner);
-            _useLoader(false);
           }, 500);
         }
 
