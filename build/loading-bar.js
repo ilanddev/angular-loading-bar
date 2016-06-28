@@ -199,9 +199,6 @@
          * Inserts the loading bar element into the dom, and sets it to 2%
          */
         function _start() {
-          if (!$animate) {
-            $animate = $injector.get('$animate');
-          }
 
           $timeout.cancel(completeTimeout);
 
@@ -225,6 +222,7 @@
           $rootScope.$broadcast('cfpLoadingBar:started');
           started = true;
 
+          $animate = _getAnimate();
           if (includeBar) {
             $animate.enter(loadingBarContainer, $parent, $after);
           }
@@ -245,9 +243,11 @@
           if (!started) {
             return;
           }
-          var pct = (n * 100) + '%';
-          loadingBar.css('width', pct);
-          status = n;
+          if (status < n) {
+            var pct = (n * 100) + '%';
+            loadingBar.css('width', pct);
+            status = n;
+          }
 
           // increment loadingbar to give the illusion that there is always
           // progress but make sure to cancel the previous timeouts so we don't
@@ -266,29 +266,28 @@
          */
         function _inc() {
           if (_status() >= 1) {
+            var promise = _getAnimate().leave(loadingBarContainer, _completeAnimation);
+            if (promise && promise.then) {
+              promise.then(_completeAnimation);
+            }
+            $rootScope.$broadcast('cfpLoadingBar:completed');
             return;
           }
 
           var rnd = 0;
-
-          // TODO: do this mathmatically instead of through conditions
-
           var stat = _status();
-          if (stat >= 0 && stat < 0.25) {
-            // Start out between 3 - 6% increments
-            rnd = (Math.random() * (5 - 3 + 1) + 3) / 100;
-          } else if (stat >= 0.25 && stat < 0.65) {
-            // increment between 0 - 3%
-            rnd = (Math.random() * 3) / 100;
-          } else if (stat >= 0.65 && stat < 0.9) {
-            // increment between 0 - 2%
-            rnd = (Math.random() * 2) / 100;
-          } else if (stat >= 0.9 && stat < 0.99) {
-            // finally, increment it .5 %
-            rnd = 0.005;
-          } else {
-            // after 99%, don't increment:
+
+          function maxIncrement(stat) {
+            return (5.5/-99)*stat+(6.0);
+          }
+          function incrementer(stat) {
+            var m = maxIncrement(stat);
+            return (Math.random() * m) / 100;
+          }
+          if (stat >= 0.99) {
             rnd = 0;
+          } else {
+            rnd = incrementer(stat);
           }
 
           var pct = _status() + rnd;
@@ -305,24 +304,22 @@
         }
 
         function _complete() {
-          if (!$animate) {
-            $animate = $injector.get('$animate');
-          }
-
-          $rootScope.$broadcast('cfpLoadingBar:completed');
-          _set(1);
 
           $timeout.cancel(completeTimeout);
 
           // Attempt to aggregate any start/complete calls within 500ms:
           completeTimeout = $timeout(function() {
-            var promise = $animate.leave(loadingBarContainer, _completeAnimation);
-            if (promise && promise.then) {
-              promise.then(_completeAnimation);
-            }
-            $animate.leave(spinner);
+            _set(1);
+            _getAnimate().leave(spinner);
             _useLoader(false);
           }, 500);
+        }
+
+        function _getAnimate() {
+          if (!$animate) {
+            $animate = $injector.get('$animate');
+          }
+          return $animate;
         }
 
         function _isLoaderActivated() {
