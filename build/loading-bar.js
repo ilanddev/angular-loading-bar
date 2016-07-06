@@ -16,6 +16,12 @@
  * Copyright (c) 2016 Wes Cruver
  * License: MIT
  */
+/*!
+ * angular-loading-bar v0.9.0
+ * https://chieffancypants.github.io/angular-loading-bar
+ * Copyright (c) 2016 Wes Cruver
+ * License: MIT
+ */
 /*
  * angular-loading-bar
  *
@@ -110,7 +116,7 @@
         function handleRequest(config) {
           // Check to make sure this request hasn't already been cached and that
           // the requester didn't explicitly ask us to ignore this request:
-          if (!config.ignoreLoadingBar && !isCached(config) && cfpLoadingBar.isLoaderActivated()) {
+          if (config && !config.ignoreLoadingBar && !isCached(config) && cfpLoadingBar.isLoaderActivated()) {
             $rootScope.$broadcast('cfpLoadingBar:loading', {url: config.url});
             if (reqsTotal === 0) {
               startTimeout = $timeout(function() {
@@ -138,6 +144,22 @@
           }
         }
 
+        /**
+         * Handle the broken interceptor to always keep the loading bar updated.
+         * @param place
+         */
+        function handleBrokenInterceptor(place) {
+          if (cfpLoadingBar.isLoaderActivated() && cfpLoadingBar.status() > 0) {
+            reqsCompleted++;
+            if (reqsCompleted >= reqsTotal) {
+              setComplete();
+            } else {
+              cfpLoadingBar.set(reqsCompleted / reqsTotal);
+            }
+          }
+          $log.error('Broken interceptor detected: Config object not supplied in '+ place +':\n https://github.com/chieffancypants/angular-loading-bar/pull/50');
+        }
+
         return {
           'request': function(config) {
             handleRequest(config);
@@ -146,7 +168,7 @@
 
           'response': function(response) {
             if (!response || !response.config) {
-              $log.error('Broken interceptor detected: Config object not supplied in response:\n https://github.com/chieffancypants/angular-loading-bar/pull/50');
+              handleBrokenInterceptor('response');
               return response;
             }
             handleResponse(response);
@@ -155,7 +177,7 @@
 
           'responseError': function(rejection) {
             if (!rejection || !rejection.config) {
-              $log.error('Broken interceptor detected: Config object not supplied in rejection:\n https://github.com/chieffancypants/angular-loading-bar/pull/50');
+              handleBrokenInterceptor('rejection');
               return $q.reject(rejection);
             }
             handleResponse(rejection);
@@ -342,7 +364,7 @@
         }
 
         function _useLoader(bool) {
-          if (typeof(bool) === 'boolean') {
+          if (typeof bool === 'boolean') {
             isActivate = bool;
           }
         }
